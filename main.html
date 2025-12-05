@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bulk Image Cropper — Refined</title>
+  <meta name="description" content="Upload, crop, preview and download multiple images as a ZIP. Improved UI and performance." />
+
+  <!-- Use a compact, modern system font stack -->
+  <style>
+    :root{
+      --bg-1: #0f1724; /* deep */
+      --bg-2: linear-gradient(135deg,#0b1220 0%, #172033 100%);
+      --card: #ffffff;
+      --muted: #94a3b8;
+      --primary: #667eea;
+      --accent: #48bb78;
+      --glass: rgba(255,255,255,0.06);
+      --radius: 14px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial; background:var(--bg-2); color:#e6eef8}
+    .wrap{max-width:1180px;margin:28px auto;padding:20px}
+
+    header{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+    .brand{display:flex;flex-direction:column}
+    .title{font-weight:800;font-size:20px;color:#fff;margin:0}
+    .subtitle{font-size:13px;color:var(--muted);margin:2px 0 0}
+
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:18px;border-radius:var(--radius);box-shadow:0 8px 24px rgba(2,6,23,0.6)}
+    .card h3{margin:0 0 12px 0;color:#e6eef8}
+
+    /* Upload zone */
+    .upload{border:2px dashed rgba(255,255,255,0.06);padding:28px;border-radius:12px;text-align:center;cursor:pointer;transition:all .18s}
+    .upload:hover{transform:translateY(-3px);border-color:rgba(102,126,234,0.45);background:rgba(102,126,234,0.03)}
+    .upload.drag{border-color:rgba(72,187,120,0.6);background:rgba(72,187,120,0.03)}
+    .upload svg{width:56px;height:56px;opacity:.95}
+    .muted{color:var(--muted);font-size:13px}
+
+    .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
+    .input,select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:inherit}
+    .input:focus, select:focus{outline:2px solid rgba(102,126,234,0.25)}
+    select{appearance:auto;cursor:pointer;background:rgba(0,0,0,0.6)}
+    select option{background:#000;color:#fff}
+    .label{font-size:13px;color:var(--muted);margin-bottom:6px}
+
+    .preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:12px}
+    .thumb{background:var(--glass);border-radius:10px;overflow:hidden;position:relative;min-height:110px;display:flex;align-items:center;justify-content:center}
+    .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .thumb .meta{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,0.55);color:#fff;padding:6px 8px;border-radius:8px;font-size:12px}
+    .thumb .rm{position:absolute;right:8px;top:8px;background:rgba(0,0,0,0.55);border:0;padding:6px;border-radius:8px;color:white;cursor:pointer}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .btn{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
+    .btn.primary{background:linear-gradient(90deg,var(--primary),#7b61f0);color:#fff}
+    .btn.positive{background:linear-gradient(90deg,var(--accent),#2f9c5a);color:#fff}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+
+    .stats{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:12px}
+    .stat{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;min-width:100px;text-align:center}
+    .stat .v{font-weight:800}
+
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+
+    /* small animations */
+    .fade{transition:opacity .25s ease,transform .25s ease}
+    .notice{position:fixed;right:22px;bottom:22px;background:#111827;color:#fff;padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(2,6,23,0.6)}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <!-- Simple logo -->
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="20" height="16" rx="3" fill="url(#g)"/></svg>
+      </div>
+      <div class="brand">
+        <h1 class="title">Bulk Image Cropper</h1>
+        <div class="subtitle">Upload multiple images, crop to a ratio or custom size, preview and download a ZIP.</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Upload & Select</h3>
+        <div id="uploadZone" class="upload" tabindex="0" role="button" aria-label="Upload images or drop files">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3v10" opacity="0.9"/><path fill="currentColor" d="M5 12l7-7 7 7" opacity="0.9"/></svg>
+          <div class="muted">Click to browse or drag & drop images here (JPG, PNG, WEBP, GIF)</div>
+          <div style="margin-top:10px" class="muted">Max files: 100 — Processed on your device</div>
+          <input id="fileInput" type="file" accept="image/*" multiple style="display:none">
+        </div>
+
+        <div class="controls">
+          <div>
+            <div class="label">Aspect</div>
+            <select id="aspectRatio" class="input" aria-label="Aspect ratio">
+              <option value="custom">Custom</option>
+              <option value="1:1">Square 1:1</option>
+              <option value="4:5">4:5</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="3:4">3:4</option>
+              <option value="4:3">4:3</option>
+            </select>
+          </div>
+
+          <div>
+            <div class="label">Ratio W : H</div>
+            <div style="display:flex;gap:8px"><input id="ratioW" class="input" type="number" min="1" value="16"><input id="ratioH" class="input" type="number" min="1" value="9"></div>
+          </div>
+
+          <div>
+            <div class="label">Output (px) — W × H</div>
+            <div style="display:flex;gap:8px"><input id="outputW" class="input" type="number" min="1" value="1920"><input id="outputH" class="input" type="number" min="1" value="1080"></div>
+          </div>
+
+          <div>
+            <div class="label">Quality (0.1 - 1.0)</div>
+            <input id="quality" class="input" type="number" min="0.1" max="1" step="0.1" value="0.92">
+          </div>
+
+          <div>
+            <div class="label">Preview mode</div>
+            <select id="previewMode" class="input"><option value="fit">Fit</option><option value="fill">Fill & Crop</option></select>
+          </div>
+
+        </div>
+
+        <div class="actions">
+          <button id="previewBtn" class="btn primary" disabled>Preview Cropped Images</button>
+          <button id="processBtn" class="btn positive" disabled>Process & Download ZIP</button>
+          <button id="clearBtn" class="btn" title="Clear all" aria-label="Clear all">Clear</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="v" id="imageCount">0</div><div class="muted">Images</div></div>
+          <div class="stat"><div class="v" id="totalSize">0 MB</div><div class="muted">Total size</div></div>
+          <div class="stat"><div class="v" id="estZip">—</div><div class="muted">Est. ZIP</div></div>
+        </div>
+
+        <div class="preview-grid" id="originalPreviewGrid" aria-live="polite"></div>
+      </section>
+
+      <aside class="card">
+        <h3>Cropped Preview</h3>
+        <div id="croppedPreviewGrid" class="preview-grid" aria-live="polite"></div>
+        <div id="notes" style="margin-top:10px;color:var(--muted);font-size:13px">Tip: use Preview first to inspect results before creating ZIP.</div>
+      </aside>
+    </div>
+
+    <footer>All processing happens in your browser. Files are not uploaded to a server.</footer>
+  </div>
+
+  <div id="toast" class="notice" style="display:none"></div>
+
+  <script>
+    // Improved, defensive script with small utilities and better UX
+    const fileInput = document.getElementById('fileInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const originalGrid = document.getElementById('originalPreviewGrid');
+    const croppedGrid = document.getElementById('croppedPreviewGrid');
+    const previewBtn = document.getElementById('previewBtn');
+    const processBtn = document.getElementById('processBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const aspectRatio = document.getElementById('aspectRatio');
+    const ratioW = document.getElementById('ratioW');
+    const ratioH = document.getElementById('ratioH');
+    const outputW = document.getElementById('outputW');
+    const outputH = document.getElementById('outputH');
+    const qualityInput = document.getElementById('quality');
+    const previewMode = document.getElementById('previewMode');
+
+    const imageCount = document.getElementById('imageCount');
+    const totalSize = document.getElementById('totalSize');
+    const estZip = document.getElementById('estZip');
+    const toast = document.getElementById('toast');
+
+    let files = [];
+    let croppedData = []; // dataURLs
+
+    function showToast(msg, ms = 2200){ toast.textContent = msg; toast.style.display = 'block'; setTimeout(()=>toast.style.display='none', ms); }
+
+    function bytesToMB(n){ return (n/(1024*1024)).toFixed(2) }
+
+    function updateStats(){
+      const total = files.reduce((s,f)=>s+f.size,0);
+      imageCount.textContent = files.length;
+      totalSize.textContent = bytesToMB(total) + ' MB';
+      // heuristic: assume output ~ quality * total
+      const q = parseFloat(qualityInput.value) || 0.9;
+      const est = Math.max(0.5,(q*total)/1024/1024*0.7*files.length/Math.max(files.length,1));
+      estZip.textContent = files.length? (bytesToMB(total*q*0.7) + ' MB') : '—';
+    }
+
+    function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+
+    // Events
+    uploadZone.addEventListener('click',()=>fileInput.click());
+    uploadZone.addEventListener('dragover',e=>{e.preventDefault(); uploadZone.classList.add('drag')});
+    uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('drag'));
+    uploadZone.addEventListener('drop',e=>{e.preventDefault();uploadZone.classList.remove('drag');handleFiles(e.dataTransfer.files)});
+    fileInput.addEventListener('change',(e)=>handleFiles(e.target.files));
+
+    function handleFiles(fileList){
+      const arr = Array.from(fileList).filter(f=>f.type && f.type.startsWith('image/'));
+      if(!arr.length){ showToast('No image files found'); return }
+      // limit to first 200
+      files = files.concat(arr).slice(0,200);
+      renderOriginals();
+      updateStats();
+      previewBtn.disabled = files.length===0;
+      processBtn.disabled = true;
+      croppedData = [];
+      croppedGrid.innerHTML='';
+    }
+
+    function renderOriginals(){
+      originalGrid.innerHTML='';
+      files.forEach((file,i)=>{
+        const item = document.createElement('div'); item.className='thumb fade';
+        const img = document.createElement('img');
+        const reader = new FileReader();
+        reader.onload = (e)=> img.src = e.target.result;
+        reader.readAsDataURL(file);
+        const rm = document.createElement('button'); rm.className='rm'; rm.innerText='✕'; rm.title='Remove'; rm.addEventListener('click',()=>{files.splice(i,1); renderOriginals(); updateStats(); processBtn.disabled=true; previewBtn.disabled = files.length===0});
+        const meta = document.createElement('div'); meta.className='meta'; meta.textContent = '#' + (i+1);
+        item.appendChild(img); item.appendChild(meta); item.appendChild(rm);
+        originalGrid.appendChild(item);
+      });
+    }
+
+    function setRatioFromSelect(){
+      const v = aspectRatio.value; if(v!=='custom'){ const [w,h] = v.split(':').map(Number); ratioW.value = w; ratioH.value = h; computeOutputFromRatio(); }
+    }
+    aspectRatio.addEventListener('change',setRatioFromSelect);
+    ratioW.addEventListener('input',computeOutputFromRatio);
+    ratioH.addEventListener('input',computeOutputFromRatio);
+
+    function computeOutputFromRatio(){
+      const w = parseInt(ratioW.value) || 16; const h = parseInt(ratioH.value) || 9; const base = Math.max(320, Math.min(3840, parseInt(outputW.value) || 1920));
+      outputW.value = base; outputH.value = Math.round(base * (h/w));
+    }
+
+    // crop util
+    function cropImageToDataURL(file, targetW, targetH, quality = 0.92, mode='fill'){
+      // Ensure numbers
+      targetW = Math.max(1, Math.round(targetW));
+      targetH = Math.max(1, Math.round(targetH));
+      const data = new FileReader();
+      return new Promise((resolve, reject) => {
+        data.onerror = () => reject(new Error('Failed to read file'));
+        data.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            try{
+              // offscreen canvas
+              const canvas = document.createElement('canvas');
+              canvas.width = targetW; canvas.height = targetH;
+              const ctx = canvas.getContext('2d');
+              // Do NOT fill background — that can create visible bands when we intend to crop.
+              ctx.clearRect(0,0,targetW,targetH);
+
+              const sw = img.naturalWidth || img.width;
+              const sh = img.naturalHeight || img.height;
+              const sAspect = sw / sh;
+              const tAspect = targetW / targetH;
+
+              if(mode === 'fit'){
+                // scale inside and center
+                const scale = Math.min(targetW / sw, targetH / sh);
+                const dw = Math.round(sw * scale), dh = Math.round(sh * scale);
+                const dx = Math.round((targetW - dw) / 2), dy = Math.round((targetH - dh) / 2);
+                ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
+              } else {
+                // 'fill' -> crop source to match target aspect, then draw to fill the canvas
+                let sx = 0, sy = 0, sW = sw, sH = sh;
+                if (sAspect > tAspect) {
+                  // source is wider -> crop left/right
+                  sH = sh;
+                  sW = Math.round(sh * tAspect);
+                  sx = Math.round((sw - sW) / 2);
+                } else if (sAspect < tAspect) {
+                  // source is taller -> crop top/bottom
+                  sW = sw;
+                  sH = Math.round(sw / tAspect);
+                  sy = Math.round((sh - sH) / 2);
+                } else {
+                  // same aspect — no crop needed
+                }
+                // Defensive: ensure integers and within bounds
+                sx = Math.max(0, Math.min(sx, sw-1)); sy = Math.max(0, Math.min(sy, sh-1));
+                sW = Math.max(1, Math.min(sW, sw - sx)); sH = Math.max(1, Math.min(sH, sh - sy));
+
+                ctx.drawImage(img, sx, sy, sW, sH, 0, 0, targetW, targetH);
+              }
+
+              // Export as JPEG with chosen quality
+              const q = clamp(parseFloat(quality) || 0.92, 0.1, 1);
+              // If the user prefers PNG (transparent) you can switch to 'image/png' — JPEG will flatten transparency to white.
+              resolve(canvas.toDataURL('image/jpeg', q));
+            }catch(e){ reject(e) }
+          };
+          img.onerror = () => reject(new Error('Failed to create image from file'));
+          // Use the FileReader result as the source
+          img.src = data.result;
+        };
+        data.readAsDataURL(file);
+      });
+    }
+
+    previewBtn.addEventListener('click', async ()=>{
+      if(!files.length) return;
+      previewBtn.disabled = true; previewBtn.innerText = 'Generating...';
+      croppedGrid.innerHTML = '';
+      croppedData = [];
+      const tW = clamp(parseInt(outputW.value)||1920, 64, 7680);
+      const tH = clamp(parseInt(outputH.value)||1080, 64, 7680);
+      const q = clamp(parseFloat(qualityInput.value)||0.92, 0.1,1);
+      const mode = previewMode.value;
+
+      try{
+        for(let i=0;i<files.length;i++){
+          const d = await cropImageToDataURL(files[i], tW, tH, q, mode);
+          croppedData.push(d);
+          const div = document.createElement('div'); div.className='thumb fade'; const img = document.createElement('img'); img.src = d; const meta = document.createElement('div'); meta.className='meta'; meta.textContent = '#'+(i+1);
+          div.appendChild(img); div.appendChild(meta);
+          croppedGrid.appendChild(div);
+        }
+        processBtn.disabled = false; showToast('Preview ready');
+      }catch(err){ console.error(err); showToast('Error generating preview'); }
+      previewBtn.innerText = 'Preview Cropped Images'; previewBtn.disabled = false;
+    });
+
+    // ZIP creation using JSZip loaded lazily
+    async function ensureJSZip(){ if(window.JSZip) return window.JSZip; return new Promise((res,rej)=>{ const s = document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload=()=>res(window.JSZip); s.onerror=rej; document.head.appendChild(s); }); }
+
+    processBtn.addEventListener('click', async ()=>{
+      if(!croppedData.length){ showToast('No cropped images — please preview first'); return }
+      processBtn.disabled = true; processBtn.innerText = 'Preparing ZIP...';
+      try{
+        const JSZip = await ensureJSZip(); const zip = new JSZip();
+        for(let i=0;i<croppedData.length;i++){
+          const d = croppedData[i]; const base = d.split(',')[1]; const name = sanitizeName(files[i].name || ('image'+(i+1)))
+          zip.file(`cropped_${i+1}_${name}.jpg`, base, {base64:true});
+        }
+        const blob = await zip.generateAsync({type:'blob'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cropped_images.zip'; a.click(); URL.revokeObjectURL(a.href);
+        showToast('ZIP ready — download started');
+      }catch(err){ console.error(err); showToast('Failed to create ZIP') }
+      processBtn.innerText = 'Process & Download ZIP'; processBtn.disabled = false;
+    });
+
+    clearBtn.addEventListener('click', ()=>{ files=[]; croppedData=[]; originalGrid.innerHTML=''; croppedGrid.innerHTML=''; updateStats(); processBtn.disabled = true; previewBtn.disabled = true; showToast('Cleared') });
+
+    function sanitizeName(n){ return n.replace(/\.[^/.]+$/,'').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,120) }
+
+    // small accessibility: keyboard to open file dialog
+    uploadZone.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click() } });
+
+    // recompute outputs when user changes outputW manually
+    outputW.addEventListener('input', ()=>{ computeOutputFromRatio() });
+
+    // initial state
+    computeOutputFromRatio(); updateStats();
+  </script>
+</body>
+</html>
